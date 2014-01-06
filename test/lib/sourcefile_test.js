@@ -22,11 +22,11 @@ describe('lib/sourcefile.js', function() {
 
 		it('throws if no filename or name is given', function() {
 			(function() {
-				new SourceFile();
+				var sf = new SourceFile();
 			}).should.throw(RX_BAD_ARGUMENT);
 
 			(function() {
-				new SourceFile('filename');
+				var sf = new SourceFile('filename');
 			}).should.throw(RX_BAD_ARGUMENT);
 		});
 
