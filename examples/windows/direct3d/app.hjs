@@ -1,0 +1,163 @@
+@compiler({
+	manual_bootstrap: true,
+	using_namespaces: [
+		'Windows::UI::Core',
+		'Windows::ApplicationModel::Core',
+		'Windows::ApplicationModel::Activation'
+	]
+});
+@import("d3d11_1.h");
+@import("DirectXMath.h");
+@import("memory.h");
+@import("agile.h");
+@import("BasicTimer.h");
+@import("CubeRenderer.h");
+
+var windowClosed = false,
+	windowVisible = true,
+	app,
+	renderer,
+	window;
+
+var ActivatedHandlerType = @generic(TypedEventHandler, 'CoreApplicationView^', 'IActivatedEventArgs^'),
+	activatedHandler,
+	SizeChangedHandlerType = @generic(TypedEventHandler, 'CoreWindow^', 'WindowSizeChangedEventArgs^'),
+	sizeChangedHandler,
+	VisibilityChangedHandlerType = @generic(TypedEventHandler, 'CoreWindow^', 'VisibilityChangedEventArgs^'),
+	visibilityChangedHandler;
+
+@class('Direct3DApp', 'IFrameworkView', [], [
+	/*
+	 IFrameworkView Methods.
+	 */
+	{
+		name: 'Initialize',
+		returnType: 'void',
+		arguments: [
+			{ name: 'applicationView', type: 'CoreApplicationView^' }
+		],
+		action: function(params) {
+			activatedHandler = new ActivatedHandlerType(app, 'OnActivated');
+			params.applicationView.add_Activated(activatedHandler);
+			renderer = new CubeRenderer();
+		}
+	},
+	{
+		name: 'SetWindow',
+		returnType: 'void',
+		arguments: [
+			{ name: 'window', type: 'CoreWindow^' }
+		],
+		action: function(params) {
+			sizeChangedHandler = new SizeChangedHandlerType(app, 'OnWindowSizeChanged');
+			visibilityChangedHandler = new VisibilityChangedHandlerType(app, 'OnVisibilityChanged');
+			window = params.window;
+			window.add_SizeChanged(sizeChangedHandler);
+			window.add_VisibilityChanged(visibilityChangedHandler);
+			renderer.Initialize(window);
+		}
+	},
+	{
+		name: 'Load',
+		returnType: 'void',
+		arguments: [
+			{ name: 'entryPoint', type: 'String^' }
+		],
+		action: function(params) {}
+	},
+	{
+		name: 'Run',
+		returnType: 'void',
+		arguments: [],
+		action: function() {
+			var timer = new BasicTimer();
+			
+			while (!windowClosed)
+			{
+				if (windowVisible)
+				{
+					timer.Update();
+					window.Dispatcher.ProcessEvents(CoreProcessEventsOption.ProcessAllIfPresent);
+					renderer.Update(timer.Total(), timer.Delta());
+					renderer.Render();
+					renderer.Present(); // This call is synchronized to the display frame rate.
+				}
+				else
+				{
+					window.Dispatcher.ProcessEvents(CoreProcessEventsOption.ProcessOneAndAllPending);
+				}
+			}
+		}
+	},
+	{
+		name: 'Uninitialize',
+		returnType: 'void',
+		arguments: [],
+		action: function(params) {}
+	},
+	/*
+	 Event Handlers.
+	 */
+	{
+		name: 'OnWindowSizeChanged',
+		forHandler: SizeChangedHandlerType,
+		returnType: 'void',
+		arguments: [
+			{ name: 'sender', type: 'CoreWindow^' },
+			{ name: 'args', type: 'WindowSizeChangedEventArgs^' }
+		],
+		action: function(params) {
+			renderer.UpdateForWindowSizeChange();
+		}
+	},
+	{
+		name: 'OnActivated',
+		forHandler: ActivatedHandlerType,
+		returnType: 'void',
+		arguments: [
+			{ name: 'applicationView', type: 'CoreApplicationView^' },
+			{ name: 'args', type: 'IActivatedEventArgs^' }
+		],
+		action: function(params) {
+			window.Activate();
+		}
+	},
+	{
+		name: 'OnWindowClosed',
+		returnType: 'void',
+		arguments: [
+			{ name: 'sender', type: 'CoreWindow^' },
+			{ name: 'args', type: 'CoreWindowEventArgs^' }
+		],
+		action: function(params) {
+			windowClosed = true;
+		}
+	},
+	{
+		name: 'OnVisibilityChanged',
+		forHandler: VisibilityChangedHandlerType,
+		returnType: 'void',
+		arguments: [
+			{ name: 'sender', type: 'CoreWindow^' },
+			{ name: 'args', type: 'VisibilityChangedEventArgs^' }
+		],
+		action: function(params) {
+			windowVisible = params.args.Visible;
+		}
+	}
+]);
+
+@class('Direct3DApplicationSource', 'IFrameworkViewSource', [], [
+	{
+		name: 'CreateView',
+		returnType: 'IFrameworkView^',
+		arguments: [],
+		action: function() {
+			app = new Direct3DApp();
+			return app;
+		}
+	}
+]);
+
+var direct3DApplicationSource = new Direct3DApplicationSource();
+CoreApplication.Run(direct3DApplicationSource);

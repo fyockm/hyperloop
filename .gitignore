@@ -1,4 +1,5 @@
 build
+build*
 node_modules
 out
 dist
@@ -25,3 +26,4 @@ Thumbs.db
 _tmp
 tmp
 $RECYCLE.BIN
+windows.il

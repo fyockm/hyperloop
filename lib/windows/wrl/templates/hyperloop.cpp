@@ -1,6 +1,7 @@
 #include "hyperloop.h"
-
-static double NAN = std::numeric_limits<double>::quiet_NaN();
+#include "nan.h"
+using namespace Platform;
+using namespace Platform::Details;
 
 std::wstring hyperloop::getWString(JSStringRef sValue) {
 	size_t sLength = JSStringGetMaximumUTF8CStringSize(sValue);
@@ -19,14 +20,20 @@ std::wstring hyperloop::getWString(JSContextRef ctx, JSValueRef ref) {
 const char* hyperloop::getCStr(Platform::String^ string) {
 	std::wstring w_str(string->Begin());
 	std::string s_str(w_str.begin(), w_str.end());
-	return s_str.c_str();
+	int length = sizeof(w_str);
+	char *c_str = new char[length];
+	strcpy_s(c_str, length, s_str.c_str());
+	return c_str;
 }
 
 const char* hyperloop::getCStr(JSContextRef ctx, JSValueRef ref) {
 	JSStringRef sValue = JSValueToStringCopy(ctx, ref, NULL);
 	std::wstring w_str = hyperloop::getWString(sValue);
 	std::string s_str(w_str.begin(), w_str.end());
-	return s_str.c_str();
+	int length = sizeof(w_str);
+	char *c_str = new char[length];
+	strcpy_s(c_str, length, s_str.c_str());
+	return c_str;
 }
 
 String^ hyperloop::getPlatformString(JSStringRef sValue) {
@@ -36,6 +43,10 @@ String^ hyperloop::getPlatformString(JSStringRef sValue) {
 	std::string s_str = cValue;
 	std::wstring w_str(s_str.begin(), s_str.end());
 	return ref new String(hyperloop::getWString(sValue).c_str());
+}
+
+String^ hyperloop::getPlatformString(JSContextRef ctx, JSStringRef ref) {
+	return hyperloop::getPlatformString(ref);
 }
 
 String^ hyperloop::getPlatformString(JSContextRef ctx, JSValueRef ref) {
@@ -70,6 +81,13 @@ JSValueRef HyperloopundefinedToJSValueRef(JSContextRef ctx, Object^ o) {
 }
 JSValueRef HyperloopundefinedToJSValueRef(JSContextRef ctx, void* o) {
 	return JSValueMakeUndefined(ctx);
+}
+
+int HyperloopGetLength(JSContextRef ctx, JSObjectRef objRef, JSValueRef *exception) {
+	JSStringRef str = JSStringCreateWithUTF8CString("length");
+	JSValueRef length = JSObjectGetProperty(ctx, objRef, str, exception);
+	JSStringRelease(str);
+	return (int)JSValueToNumber(ctx, length, exception);
 }
 
 /**
@@ -345,6 +363,24 @@ void HyperloopDestroyVM (JSGlobalContextRef ctx)
 String^ HyperloopToStringFromString(JSContextRef ctx, JSStringRef stringRef) {
 	return hyperloop::getPlatformString(stringRef);
 }
+void *HyperloopJSValueRefTovoid(JSContextRef ctx, JSValueRef value, JSValueRef *exception, bool *cleanup) {
+	if (JSValueIsObject(ctx, value)) {
+		JSObjectRef object = JSValueToObject(ctx, value, exception);
+		JSPrivateObject *p = reinterpret_cast<JSPrivateObject*>(JSObjectGetPrivate(object));
+        if (p != nullptr)
+        {
+            if (p->type == JSPrivateObjectTypeID)
+            {
+                return reinterpret_cast<void *>(p->object);
+            }
+			else
+            {
+                return p->buffer;
+            }
+        }
+	}
+    return nullptr;
+}
 
 JSValueRef HyperloopboolToJSValueRef(JSContextRef ctx, bool boolean) {
 	return JSValueMakeBoolean(ctx, boolean);
@@ -357,6 +393,7 @@ bool HyperloopJSValueRefTobool(JSContextRef ctx, JSValueRef value, JSValueRef *e
 }
 
 <% [ 'float64', 'float32', 'float',
+		'double',
 		'int64', 'int32', 'int16', 'int8', 'int',
 		'uint8', 'uint16', 'uint32', 'uint64'
 	]
@@ -370,16 +407,32 @@ JSValueRef Hyperloop<%- type %>ToJSValueRef(JSContextRef ctx, <%- type %> val) {
 	}
     return 0;
 }
+JSValueRef Hyperloop<%- type %>ArrayToJSValueRef(JSContextRef ctx, <%- type %>* val, int length) {
+	throw ref new Exception(0, "Hyperloop<%- type %>ArrayToJSValueRef has not been implemented yet!");
+}
+<%- type %>* HyperloopJSValueRefTo<%- type %>Array(JSContextRef ctx, JSValueRef value, JSValueRef *exception, bool *cleanup) {
+	if (JSValueIsObject(ctx, value)) {
+		JSObjectRef objRef = JSValueToObject(ctx, value, exception);
+		int length = HyperloopGetLength(ctx, objRef, exception);
+		auto result = new <%- type %>[length];
+		for (int i = 0; i < length; i++) {
+			JSValueRef val = JSObjectGetPropertyAtIndex(ctx, objRef, i, exception);
+			result[i] = HyperloopJSValueRefTo<%- type %>(ctx, val, exception, 0);
+		}
+        return result;
+	}
+    return 0;
+}
 <% }) %>
 
 JSClassDefinition ClassDefinitionForObject;
 JSClassDefinition ClassDefinitionForObjectConstructor;
 JSClassRef ObjectClassDef;
 JSClassRef ObjectClassDefForConstructor;
-JSValueRef HyperloopstringToJSValueRef(JSContextRef ctx, String^ val) {
+JSValueRef HyperloopStringToJSValueRef(JSContextRef ctx, String^ val) {
 	return hyperloop::getJSValueRef(ctx, val);
 }
-String^ HyperloopJSValueRefTostring(JSContextRef ctx, JSValueRef value, JSValueRef *exception, bool *cleanup) {
+String^ HyperloopJSValueRefToString(JSContextRef ctx, JSValueRef value, JSValueRef *exception, bool *cleanup) {
 	return hyperloop::getPlatformString(ctx, value);
 }
 JSObjectRef MakeObjectForObject(JSContextRef ctx, Object^ instance)

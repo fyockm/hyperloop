@@ -10,43 +10,58 @@ using namespace Windows::ApplicationModel::Activation;
 #include <Windows.h>
 #include "hyperloop.h"
 #include "GeneratedApp.h"
-
 <% function boot() { %>
-		JSGlobalContextRef ctx = HyperloopCreateVM();
-		JSObjectRef global = JSContextGetGlobalObject(ctx);
-		GeneratedApp::loadWithObject(ctx, global);
-		JSStringRef script = GeneratedApp::source(),
-			sourceURL = JSStringCreateWithUTF8CString("app.hjs");
-		JSValueRef exception = NULL;
-		JSValueRef result = JSEvaluateScript(ctx, script, global, sourceURL, 0, &exception);
-		CHECK_EXCEPTION(ctx, exception);
-		String^ sResult = hyperloop::getPlatformString(ctx, result);
-		JSStringRelease(sourceURL);
-		JSStringRelease(script);
-<% } %>
-<% if (!App) { %>
+	JSGlobalContextRef ctx = HyperloopCreateVM();
+	JSObjectRef global = JSContextGetGlobalObject(ctx);
+	GeneratedApp::loadWithObject(ctx, global);
+	JSStringRef script = GeneratedApp::source(),
+		sourceURL = JSStringCreateWithUTF8CString("app.hjs");
+	JSValueRef exception = NULL;
+	JSValueRef result = JSEvaluateScript(ctx, script, global, sourceURL, 0, &exception);
+	CHECK_EXCEPTION(ctx, exception);
+	String^ sResult = hyperloop::getPlatformString(ctx, result);
+	JSStringRelease(sourceURL);
+	JSStringRelease(script);
+<% }
+if (!compiler.manual_bootstrap) { %>
 ref class HyperloopApp sealed : public Application
 {
 public:
 	virtual void OnLaunched(LaunchActivatedEventArgs^ args) override;
+	virtual void OnActivated(IActivatedEventArgs^ args) override;
 private:
+	void Boot();
 	JSContextRef context;
+	bool booted;
 };
 void HyperloopApp::OnLaunched(LaunchActivatedEventArgs^ args)
 {
-		<% boot() %>
+	Boot();
+}
+void HyperloopApp::OnActivated(IActivatedEventArgs^ args)
+{
+	if (args->Kind == Windows::ApplicationModel::Activation::ActivationKind::Protocol)
+	{
+		Boot();
+	}
+}
+void HyperloopApp::Boot()
+{
+	if (booted) {
+		return;
+	}
+	booted = true;
+	<% boot() %>
 }
 <% } %>
-
+[Platform::MTAThread]
 int main(Platform::Array<Platform::String^>^)
-{
+{<% if (!compiler.manual_bootstrap) { %>
 	Application::Start(ref new ApplicationInitializationCallback([](ApplicationInitializationCallbackParams^ params) {
-		<% if (!App) { %>
 		HyperloopApp^ app = ref new HyperloopApp();
-		<% } else { %>
-		<% boot() %>
-		<% } %>
-	}));
-
+	}));<%
+	} else {
+		boot();
+	} %>
 	return 0;
 }

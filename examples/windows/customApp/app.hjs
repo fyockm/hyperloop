@@ -1,31 +1,63 @@
 /**
- * In this example, we're going to create a new AppDelegate class and install
- * it using the @compiler setting
+ * In this example, we're going to bootstrap the app entirely in JavaScript.
+ * Note that it is much easier to let Hyperloop bootstrap your app for you.
+ * See "examples/windows/simple/app.hjs" to see what that looks like.
  */
-@compiler({
-	App: 'CustomApp'
-});
+@compiler({ manual_bootstrap: true });
 
 @class('CustomApp', Application, [], [
+	// If the app is directly launched...
 	{
 		override: true,
 		name: 'OnLaunched',
 		returnType: 'void',
 		arguments: [ { name: 'args', type: 'LaunchActivatedEventArgs^' } ],
+		action: startApp
+	},
+	// Or, if the app is activated by a protocol...
+	{
+		override: true,
+		name: 'OnActivated',
+		returnType: 'void',
+		arguments: [ { name: 'args', type: 'IActivatedEventArgs^' } ],
+		action: startApp
+	}
+]);
+
+@class('ApplicationInitializationHandler', null, [], [
+	{
+		name: 'Initialized',
+		forHandler: 'ApplicationInitializationCallback',
+		returnType: 'void',
+		arguments: [
+			{ name: 'params', type: 'ApplicationInitializationCallbackParams^' }
+		],
 		action: function(params) {
-			var window = Window.Current,
-				text = new TextBlock();
-
-			text.Text = "Hello, world!";
-			text.TextAlignment = TextAlignment.Center;
-			text.VerticalAlignment = VerticalAlignment.Center;
-			text.HorizontalAlignment = HorizontalAlignment.Center;
-			text.FontSize = 60;
-
-			window.Content = text;
-			window.Activate();
+			new CustomApp();
 		}
 	}
 ]);
 
-var CustomApp = new CustomApp();
+var started = false;
+function startApp() {
+	// Ensure we don't start the app twice.
+	if (started) {
+		return;
+	}
+	started = true;
+
+	var window = Window.Current,
+		text = new TextBlock();
+
+	text.Text = "Hello, world!";
+	text.TextAlignment = TextAlignment.Center;
+	text.VerticalAlignment = VerticalAlignment.Center;
+	text.HorizontalAlignment = HorizontalAlignment.Center;
+	text.FontSize = 60;
+
+	window.Content = text;
+	window.Activate();
+}
+
+var handler = new ApplicationInitializationHandler();
+Application.Start(new ApplicationInitializationCallback(handler));

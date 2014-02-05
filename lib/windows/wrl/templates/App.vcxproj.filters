@@ -6,15 +6,16 @@
     <ClCompile Include="JSBuffer.cpp" />
     <ClCompile Include="GeneratedApp.cpp" />
     <% for (var i = 0, iL = implementations.length; i < iL; i++) { %>
-    <ClCompile Include="Generated/<%- implementations[i] %>"><Filter>Generated</Filter></ClCompile><% } %>
+    <ClCompile Include="<%- implementations[i] %>"><%- pathToFilter(implementations[i]) %></ClCompile><% } %>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="nan.h" />
     <ClInclude Include="hyperloop.h" />
     <ClInclude Include="JSBuffer.h" />
     <ClInclude Include="JSPrivateObject.h" />
     <ClInclude Include="GeneratedApp.h" />
     <% for (var j = 0, jL = headers.length; j < jL; j++) { %>
-    <ClInclude Include="Generated/<%- headers[j] %>"><Filter>Generated</Filter></ClInclude><% } %>
+    <ClInclude Include="<%- headers[j] %>"><%- pathToFilter(headers[j]) %></ClInclude><% } %>
   </ItemGroup>
   <ItemGroup>
     <Image Include="Assets\Logo.png" />
@@ -34,3 +35,11 @@
     </Filter>
   </ItemGroup>
 </Project>
+<%
+function pathToFilter(path) {
+	var split = path.split('/');
+	return split.length === 1
+		? ''
+		: ('<Filter>' + split[0] + '</Filter>');
+}
+%>
